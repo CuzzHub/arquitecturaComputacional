@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Compila y corre el testbench de esta carpeta con SiliconCompiler,
-usando Verilator como motor de simulacion y generando una onda .fst
-para verla con Surfer.
+"""Compilen y corran el testbench de esta carpeta con SiliconCompiler,
+usando Verilator como motor de simulacion y generando una onda para
+verla con Surfer.
+
+alu8.v y alu8_tb.v son Verilog puro (sin SystemVerilog), por lo que
+este script valida lo mismo que exige Silicluster v3.
 
 Uso:
-    python3 sc_run.py            - compila y corre half/full/ripple_carry_adder
+    python3 sc_run.py            - compila y corre alu8_tb, reporta PASS/FAIL
     python3 sc_run.py --wave     - igual, y ademas abre la onda en Surfer
-    python3 sc_run.py --view     - abre el waveform.fst incluido, sin simular
+    python3 sc_run.py --view     - abre el waveform.vcd incluido, sin simular
 """
 import argparse
 import os
@@ -29,25 +32,23 @@ VERILATOR_WARNINGS_OFF = [
     "-Wno-UNOPTFLAT", "-Wno-TIMESCALEMOD", "-Wno-IEEEMAYDEPRECATE", "-Wno-LATCH",
 ]
 
-TOPMODULE = "adders_tb"
+TOPMODULE = "alu8_tb"
 
 
-class AddersDesign(Design):
-    """half_adder + full_adder + ripple_carry_adder (4 bits)."""
+class Alu8Design(Design):
+    """ALU de 8 bits (alu8.v) + su testbench (alu8_tb.v), en Verilog puro."""
 
     def __init__(self):
         super().__init__()
-        self.set_name("adders")
-        self.set_dataroot("adders", HERE)
-        with self.active_dataroot("adders"):
+        self.set_name("alu8")
+        self.set_dataroot("alu8", HERE)
+        with self.active_dataroot("alu8"):
             with self.active_fileset("rtl"):
-                self.set_topmodule("ripple_carry_adder")
-                self.add_file("half_adder.sv")
-                self.add_file("full_adder.sv")
-                self.add_file("ripple_carry_adder.sv")
+                self.set_topmodule("alu8")
+                self.add_file("alu8.v")
             with self.active_fileset("testbench.verilator.v"):
                 self.set_topmodule(TOPMODULE)
-                self.add_file("adders_tb.sv")
+                self.add_file("alu8_tb.v")
 
 
 def _configure_verilator_task(project):
@@ -65,19 +66,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--wave", action="store_true", help="abrir la onda en Surfer al terminar")
     parser.add_argument("--view", action="store_true",
-                        help="abrir el waveform.fst incluido, sin simular")
+                        help="abrir el waveform.vcd incluido, sin simular")
     args = parser.parse_args()
 
     if args.view:
-        subprocess.call(["surfer", os.path.join(HERE, "waveform.fst")])
+        subprocess.call(["surfer", os.path.join(HERE, "waveform.vcd")])
         return
 
     project = Sim()
-    project.set_design(AddersDesign())
+    project.set_design(Alu8Design())
     project.add_fileset("testbench.verilator.v")
     project.add_fileset("rtl")
 
-    flow = Flowgraph("adders_sim")
+    flow = Flowgraph("alu8_sim")
     flow.node("compile", verilator_compile.CompileTask())
     flow.node("simulate", ExecInputTask())
     flow.edge("compile", "simulate")
@@ -89,12 +90,12 @@ def main():
     project.summary()
 
     if args.wave:
-        fst = project.find_result(step="simulate", index="0", directory=".",
-                                  filename=f"{TOPMODULE}.fst")
-        if fst:
-            project.show(fst)
+        vcd = project.find_result(step="simulate", index="0", directory=".",
+                                  filename=f"{TOPMODULE}.vcd")
+        if vcd:
+            project.show(vcd)
         else:
-            print(f"No se encontro la onda {TOPMODULE}.fst")
+            print(f"No se encontro la onda {TOPMODULE}.vcd")
 
 
 if __name__ == "__main__":
